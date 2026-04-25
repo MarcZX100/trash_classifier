@@ -315,38 +315,55 @@
     }
 
     async function predict() {
-      const prediction = await model.predict(webcam.canvas);
+  const prediction = await model.predict(webcam.canvas);
+  
+  // 1. Ordenar de mayor a menor probabilidad
+  prediction.sort((a, b) => b.probability - a.probability);
 
-      prediction.sort((a, b) => b.probability - a.probability);
+  const best = prediction[0];
+  const percent = Math.round(best.probability * 100);
+  
+  // --- CONFIGURACIÓN DEL UMBRAL ---
+  const UMBRAL_MINIMO = 85; // Solo acepta resultados con más del 85% de certeza
+  // --------------------------------
 
-      const best = prediction[0];
-      const className = best.className.toUpperCase();
-      const percent = Math.round(best.probability * 100);
+  const mainResultDiv = document.getElementById("main-result");
+  const confidenceDiv = document.getElementById("confidence");
+  const containerNameDiv = document.getElementById("container-name");
+  const containerDescDiv = document.getElementById("container-desc");
 
-      document.getElementById("main-result").innerText = className;
-      document.getElementById("confidence").innerText = "Confianza: " + percent + "%";
+  if (percent > UMBRAL_MINIMO) {
+    // Si supera el umbral, mostramos el resultado real
+    const className = best.className.toUpperCase();
+    mainResultDiv.innerText = className;
+    confidenceDiv.innerText = "Confianza: " + percent + "%";
+    confidenceDiv.style.background = "#4caf50"; // Verde si es confiable
 
-      if (contenedores[className]) {
-        document.getElementById("container-name").innerText = contenedores[className][0];
-        document.getElementById("container-desc").innerText = contenedores[className][1];
-      } else {
-        document.getElementById("container-name").innerText = "No definido";
-        document.getElementById("container-desc").innerText = "Añade este tipo de residuo al diccionario del código.";
-      }
-
-      for (let i = 0; i < prediction.length; i++) {
-        const p = prediction[i];
-        const value = Math.round(p.probability * 100);
-        const item = labelContainer.childNodes[i];
-
-        item.querySelector(".probability-header").innerHTML = `
-          <span>${p.className}</span>
-          <span>${value}%</span>
-        `;
-
-        item.querySelector(".fill").style.width = value + "%";
-      }
+    if (contenedores[className]) {
+      containerNameDiv.innerText = contenedores[className][0];
+      containerDescDiv.innerText = contenedores[className][1];
     }
+  } else {
+    // Si no llega al umbral, ignoramos el fondo y reseteamos la UI
+    mainResultDiv.innerText = "Buscando objeto...";
+    confidenceDiv.innerText = "Baja precisión (" + percent + "%)";
+    confidenceDiv.style.background = "#9ca3af"; // Gris
+    containerNameDiv.innerText = "---";
+    containerDescDiv.innerText = "Coloca el residuo frente a la cámara.";
+  }
+
+  // Actualizar las barritas de probabilidades siempre (opcional)
+  for (let i = 0; i < prediction.length; i++) {
+    const p = prediction[i];
+    const value = Math.round(p.probability * 100);
+    const item = labelContainer.childNodes[i];
+    item.querySelector(".probability-header").innerHTML = `
+      <span>${p.className}</span>
+      <span>${value}%</span>
+    `;
+    item.querySelector(".fill").style.width = value + "%";
+  }
+}
   </script>
 </body>
 </html>
