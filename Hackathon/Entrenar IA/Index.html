@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detector de Basura</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f3faf2, #ffffff);
+      color: #1f2937;
+      padding: 30px;
+    }
+
+    .header {
+      background: white;
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 42px;
+      margin: 0;
+    }
+
+    .header span {
+      color: #4caf50;
+    }
+
+    .header p {
+      margin-top: 8px;
+      color: #6b7280;
+      font-size: 18px;
+    }
+
+    .badge {
+      background: #eaf7ea;
+      color: #3f8f3f;
+      padding: 14px 22px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 30px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 26px;
+    }
+
+    #webcam-container canvas {
+      width: 100%;
+      max-width: 680px;
+      border-radius: 22px;
+      border: 4px solid #e5f4e5;
+      display: block;
+      margin: 20px auto;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    button {
+      border: none;
+      padding: 16px 26px;
+      border-radius: 18px;
+      font-size: 18px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      background: #4caf50;
+      color: white;
+      flex: 1;
+    }
+
+    .secondary {
+      background: white;
+      color: #4caf50;
+      border: 2px solid #4caf50;
+      flex: 1;
+    }
+
+    .result-box {
+      border: 2px solid #d7ecd7;
+      background: #f8fff8;
+      border-radius: 22px;
+      padding: 26px;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .icon {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: #4caf50;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 18px;
+      font-size: 42px;
+    }
+
+    #main-result {
+      font-size: 34px;
+      font-weight: bold;
+      color: #4caf50;
+      margin: 10px 0;
+    }
+
+    #confidence {
+      background: #4caf50;
+      color: white;
+      display: inline-block;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .container-box {
+      background: #edf6ff;
+      border-radius: 18px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    #container-name {
+      font-size: 28px;
+      font-weight: bold;
+      color: #2563eb;
+    }
+
+    .probability {
+      margin-bottom: 16px;
+    }
+
+    .probability-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .bar {
+      height: 12px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      width: 0%;
+      background: #4caf50;
+      transition: width 0.3s;
+    }
+
+    .footer {
+      margin-top: 30px;
+      background: white;
+      border-radius: 22px;
+      padding: 22px 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      color: #3f8f3f;
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div>
+      <h1>♻️ Detector de <span>Basura</span></h1>
+      <p>Usa la cámara para identificar el tipo de residuo y su contenedor correcto.</p>
+    </div>
+    <div class="badge">🌱 Juntos por un planeta más limpio</div>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <h2>📷 Cámara en vivo</h2>
+      <div id="webcam-container"></div>
+
+      <div class="buttons">
+        <button class="primary" onclick="init()">Iniciar detección</button>
+        <button class="secondary" onclick="location.reload()">Reiniciar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔍 Resultado</h2>
+
+      <div class="result-box">
+        <div class="icon">🗑️</div>
+        <div id="main-result">Esperando...</div>
+        <div id="confidence">Confianza: 0%</div>
+
+        <div class="container-box">
+          <p>Deposita en:</p>
+          <div id="container-name">---</div>
+          <p id="container-desc">Muestra un objeto a la cámara.</p>
+        </div>
+      </div>
+
+      <h2>📊 Probabilidades</h2>
+      <div id="label-container"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Reciclar correctamente hace la diferencia. Gracias por contribuir a una Barcelona más sostenible.
+  </div>
+
+  <script>
+    const URL = "./";
+
+    let model, webcam, labelContainer, maxPredictions;
+    let started = false;
+
+    const contenedores = {
+      "PLASTICO": ["Contenedor AMARILLO", "Plásticos, latas y envases."],
+      "VIDRIO": ["Contenedor VERDE", "Botellas y tarros de vidrio."],
+      "PAPEL": ["Contenedor AZUL", "Papel y cartón."],
+      "ORGANICO": ["Contenedor MARRÓN", "Restos de comida y residuos orgánicos."],
+      "RECHAZO": ["Contenedor GRIS", "Residuos que no se pueden reciclar."]
+    };
+
+    async function init() {
+      if (started) return;
+      started = true;
+
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      webcam = new tmImage.Webcam(500, 500, true);
+      await webcam.setup();
+      await webcam.play();
+
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+
+      for (let i = 0; i < maxPredictions; i++) {
+        const div = document.createElement("div");
+        div.className = "probability";
+        div.innerHTML = `
+          <div class="probability-header">
+            <span>Clase</span>
+            <span>0%</span>
+          </div>
+          <div class="bar">
+            <div class="fill"></div>
+          </div>
+        `;
+        labelContainer.appendChild(div);
+      }
+
+      window.requestAnimationFrame(loop);
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
+
+      prediction.sort((a, b) => b.probability - a.probability);
+
+      const best = prediction[0];
+      const className = best.className.toUpperCase();
+      const percent = Math.round(best.probability * 100);
+
+      document.getElementById("main-result").innerText = className;
+      document.getElementById("confidence").innerText = "Confianza: " + percent + "%";
+
+      if (contenedores[className]) {
+        document.getElementById("container-name").innerText = contenedores[className][0];
+        document.getElementById("container-desc").innerText = contenedores[className][1];
+      } else {
+        document.getElementById("container-name").innerText = "No definido";
+        document.getElementById("container-desc").innerText = "Añade este tipo de residuo al diccionario del código.";
+      }
+
+      for (let i = 0; i < prediction.length; i++) {
+        const p = prediction[i];
+        const value = Math.round(p.probability * 100);
+        const item = labelContainer.childNodes[i];
+
+        item.querySelector(".probability-header").innerHTML = `
+          <span>${p.className}</span>
+          <span>${value}%</span>
+        `;
+
+        item.querySelector(".fill").style.width = value + "%";
+      }
+    }
+  </script>
+</body>
+</html>
